@@ -167,23 +167,40 @@
           <th>Kelas</th>
           <th>Guru</th>
           <th>Materi</th>
-          <th>Murid Tidak Hadir</th>
+          <th>Presensi (H/I/S/A)</th>
+          <th>Tidak Hadir</th>
           <th>Catatan</th>
         </tr>
       </thead>
       <tbody>
         @forelse($this->getCatatan() as $c)
+        @php
+            $ringkasan = $c->getRingkasanPresensi();
+            $tidakHadir = collect();
+            foreach (['izin', 'sakit', 'alpa'] as $status) {
+                $siswa = $c->getSiswaByStatus($status);
+                foreach ($siswa as $nama) {
+                    $label = match($status) {
+                        'izin' => '📝',
+                        'sakit' => '🏥',
+                        'alpa' => '❌',
+                    };
+                    $tidakHadir->push("{$label} {$nama}");
+                }
+            }
+        @endphp
         <tr>
           <td>{{ $c->tanggal }}</td>
           <td>{{ $c->jadwal?->kelas?->nama ?? '-' }}</td>
           <td>{{ $c->jadwal?->guru?->name ?? '-' }}</td>
           <td>{{ $c->materi }}</td>
-          <td>{{ $c->murid_tidak_hadir }}</td>
+          <td>{{ $ringkasan['hadir'] }}/{{ $ringkasan['izin'] }}/{{ $ringkasan['sakit'] }}/{{ $ringkasan['alpa'] }}</td>
+          <td>{{ $tidakHadir->isEmpty() ? '-' : $tidakHadir->join(', ') }}</td>
           <td>{{ $c->catatan }}</td>
         </tr>
         @empty
         <tr>
-          <td colspan="6" class="table-empty">Data tidak ditemukan</td>
+          <td colspan="7" class="table-empty">Data tidak ditemukan</td>
         </tr>
         @endforelse
       </tbody>

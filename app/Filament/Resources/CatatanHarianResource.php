@@ -40,17 +40,102 @@ class CatatanHarianResource extends Resource
                 ->default(fn() => auth()->id()),
             Forms\Components\Select::make('jadwal_id')
                 ->label('Jadwal Kelas/Mapel/Guru')
-                ->options(
-                    \App\Models\Jadwal::with(['kelas', 'mataPelajaran', 'guru'])->get()
-                        ->mapWithKeys(fn($j) => [
-                            $j->id => $j->kelas->nama . ' - ' . $j->mataPelajaran->nama . ' (' . $j->guru->name . ')'
-                        ])
+                ->relationship(
+                    'jadwal',
+                    modifyQueryUsing: function (Builder $query) {
+                        $user = auth()->user();
+                        
+                        // Admin bisa lihat semua jadwal
+                        if ($user->hasRole('admin')) {
+                            return $query;
+                        }
+                        
+                        $isGuru = $user->hasRole('guru');
+                        $isWaliKelas = $user->hasRole('wali_kelas');
+                        
+                        // Ambil kelas yang diwalikan (jika wali kelas)
+                        $kelasWaliIds = $isWaliKelas 
+                            ? \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id')->toArray()
+                            : [];
+                        
+                        return $query->where(function ($q) use ($user, $isGuru, $isWaliKelas, $kelasWaliIds) {
+                            // Guru: lihat jadwal yang dia ajar
+                            if ($isGuru) {
+                                $q->orWhere('guru_id', $user->id);
+                            }
+                            // Wali Kelas: lihat jadwal di kelas yang diwalikan
+                            if ($isWaliKelas && !empty($kelasWaliIds)) {
+                                $q->orWhereIn('kelas_id', $kelasWaliIds);
+                            }
+                        });
+                    }
+                )
+                ->getOptionLabelFromRecordUsing(fn($record) => 
+                    $record->kelas->nama . ' - ' . $record->mataPelajaran->nama . ' (' . $record->guru->name . ')'
                 )
                 ->searchable()
-                ->required(),
+                ->preload()
+                ->required()
+                ->live()
+                ->afterStateUpdated(function ($state, callable $set) {
+                    if (!$state) {
+                        $set('presensis', []);
+                        return;
+                    }
+                    
+                    // Load siswa dari kelas jadwal yang dipilih
+                    $jadwal = \App\Models\Jadwal::with('kelas.siswa')->find($state);
+                    if (!$jadwal || !$jadwal->kelas) {
+                        $set('presensis', []);
+                        return;
+                    }
+                    
+                    $presensis = $jadwal->kelas->siswa->map(fn($siswa) => [
+                        'siswa_id' => $siswa->id,
+                        'status' => 'hadir',
+                        'keterangan' => null,
+                    ])->toArray();
+                    
+                    $set('presensis', $presensis);
+                }),
             Forms\Components\DatePicker::make('tanggal')->label('Tanggal')->required()->default(now()),
             Forms\Components\Textarea::make('materi')->label('Materi')->rows(2)->nullable(),
-            Forms\Components\Textarea::make('murid_tidak_hadir')->label('Murid Tidak Hadir')->rows(2)->nullable(),
+            
+            // Section Presensi Siswa
+            Forms\Components\Section::make('Presensi Siswa')
+                ->description('Centang status kehadiran setiap siswa')
+                ->schema([
+                    Forms\Components\Repeater::make('presensis')
+                        ->relationship()
+                        ->label('')
+                        ->schema([
+                            Forms\Components\Hidden::make('siswa_id'),
+                            Forms\Components\Placeholder::make('nama_siswa')
+                                ->label('Nama Siswa')
+                                ->content(fn($get) => \App\Models\Siswa::find($get('siswa_id'))?->nama ?? '-'),
+                            Forms\Components\Select::make('status')
+                                ->label('Status')
+                                ->options([
+                                    'hadir' => '✅ Hadir',
+                                    'izin' => '📝 Izin',
+                                    'sakit' => '🏥 Sakit',
+                                    'alpa' => '❌ Alpa',
+                                ])
+                                ->default('hadir')
+                                ->required(),
+                            Forms\Components\TextInput::make('keterangan')
+                                ->label('Keterangan')
+                                ->placeholder('Opsional')
+                                ->nullable(),
+                        ])
+                        ->columns(4)
+                        ->defaultItems(0)
+                        ->addable(false)
+                        ->deletable(false)
+                        ->reorderable(false),
+                ])
+                ->visible(fn($get) => $get('jadwal_id') !== null),
+            
             Forms\Components\Textarea::make('jam_kosong')->label('Jam Kosong')->rows(2)->nullable(),
             Forms\Components\Textarea::make('catatan')->label('Catatan')->rows(3)->nullable(),
         ]);
@@ -74,18 +159,114 @@ class CatatanHarianResource extends Resource
                 ->color(fn($state) => $state ? 'success' : 'warning'),
         ])
             ->filters([
-
                 SelectFilter::make('kelas')
                     ->label('Kelas')
-                    ->relationship('jadwal.kelas', 'nama'),
+                    ->options(function () {
+                        $user = auth()->user();
+                        $query = \App\Models\Kelas::query();
+                        
+                        if (!$user->hasRole('admin')) {
+                            $isGuru = $user->hasRole('guru');
+                            $isWaliKelas = $user->hasRole('wali_kelas');
+                            
+                            $kelasIds = collect();
+                            
+                            // Guru: kelas dari jadwal yang diajar
+                            if ($isGuru) {
+                                $kelasIds = $kelasIds->merge(
+                                    \App\Models\Jadwal::where('guru_id', $user->id)->pluck('kelas_id')
+                                );
+                            }
+                            
+                            // Wali Kelas: kelas yang diwalikan
+                            if ($isWaliKelas) {
+                                $kelasIds = $kelasIds->merge(
+                                    \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id')
+                                );
+                            }
+                            
+                            $query->whereIn('id', $kelasIds->unique());
+                        }
+                        
+                        return $query->pluck('nama', 'id');
+                    })
+                    ->query(fn (Builder $query, array $data) => 
+                        $query->when($data['value'], fn($q) => 
+                            $q->whereHas('jadwal', fn($j) => $j->where('kelas_id', $data['value']))
+                        )
+                    ),
 
                 SelectFilter::make('mapel')
                     ->label('Mapel')
-                    ->relationship('jadwal.mataPelajaran', 'nama'),
+                    ->options(function () {
+                        $user = auth()->user();
+                        
+                        if ($user->hasRole('admin')) {
+                            return \App\Models\MataPelajaran::pluck('nama', 'id');
+                        }
+                        
+                        $isGuru = $user->hasRole('guru');
+                        $isWaliKelas = $user->hasRole('wali_kelas');
+                        
+                        $mapelIds = collect();
+                        
+                        // Guru: mapel dari jadwal yang diajar
+                        if ($isGuru) {
+                            $mapelIds = $mapelIds->merge(
+                                \App\Models\Jadwal::where('guru_id', $user->id)->pluck('mapel_id')
+                            );
+                        }
+                        
+                        // Wali Kelas: mapel di kelas yang diwalikan
+                        if ($isWaliKelas) {
+                            $kelasIds = \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id');
+                            $mapelIds = $mapelIds->merge(
+                                \App\Models\Jadwal::whereIn('kelas_id', $kelasIds)->pluck('mapel_id')
+                            );
+                        }
+                        
+                        return \App\Models\MataPelajaran::whereIn('id', $mapelIds->unique())->pluck('nama', 'id');
+                    })
+                    ->query(fn (Builder $query, array $data) => 
+                        $query->when($data['value'], fn($q) => 
+                            $q->whereHas('jadwal', fn($j) => $j->where('mapel_id', $data['value']))
+                        )
+                    ),
 
                 SelectFilter::make('guru')
                     ->label('Guru')
-                    ->relationship('jadwal.guru', 'name'),
+                    ->options(function () {
+                        $user = auth()->user();
+                        
+                        if ($user->hasRole('admin')) {
+                            return \App\Models\User::role('guru')->pluck('name', 'id');
+                        }
+                        
+                        $isGuru = $user->hasRole('guru');
+                        $isWaliKelas = $user->hasRole('wali_kelas');
+                        
+                        $guruIds = collect();
+                        
+                        // Guru: diri sendiri
+                        if ($isGuru) {
+                            $guruIds->push($user->id);
+                        }
+                        
+                        // Wali Kelas: guru yang mengajar di kelas yang diwalikan
+                        if ($isWaliKelas) {
+                            $kelasIds = \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id');
+                            $guruIds = $guruIds->merge(
+                                \App\Models\Jadwal::whereIn('kelas_id', $kelasIds)->pluck('guru_id')
+                            );
+                        }
+                        
+                        return \App\Models\User::whereIn('id', $guruIds->unique())->pluck('name', 'id');
+                    })
+                    ->query(fn (Builder $query, array $data) => 
+                        $query->when($data['value'], fn($q) => 
+                            $q->whereHas('jadwal', fn($j) => $j->where('guru_id', $data['value']))
+                        )
+                    ),
 
                 Filter::make('tanggal')
                     ->form([
@@ -161,8 +342,33 @@ class CatatanHarianResource extends Resource
 
                     Textarea::make('materi')->label('Materi')->disabled(),
                     Textarea::make('catatan')->label('Catatan')->disabled(),
-                    Textarea::make('murid_tidak_hadir')->label('Murid Tidak Hadir')->disabled(),
                     Textarea::make('jam_kosong')->label('Jam Kosong')->disabled(),
+
+                    // Ringkasan Presensi
+                    Placeholder::make('ringkasan_presensi')
+                        ->label('Ringkasan Presensi')
+                        ->content(function ($record) {
+                            $ringkasan = $record->getRingkasanPresensi();
+                            return "✅ Hadir: {$ringkasan['hadir']} | 📝 Izin: {$ringkasan['izin']} | 🏥 Sakit: {$ringkasan['sakit']} | ❌ Alpa: {$ringkasan['alpa']}";
+                        }),
+                    
+                    Placeholder::make('siswa_tidak_hadir')
+                        ->label('Siswa Tidak Hadir')
+                        ->content(function ($record) {
+                            $tidakHadir = collect();
+                            foreach (['izin', 'sakit', 'alpa'] as $status) {
+                                $siswa = $record->getSiswaByStatus($status);
+                                foreach ($siswa as $nama) {
+                                    $label = match($status) {
+                                        'izin' => '📝',
+                                        'sakit' => '🏥',
+                                        'alpa' => '❌',
+                                    };
+                                    $tidakHadir->push("{$label} {$nama}");
+                                }
+                            }
+                            return $tidakHadir->isEmpty() ? 'Semua hadir' : $tidakHadir->join(', ');
+                        }),
 
                     Placeholder::make('user.name')->label('Diinput oleh'),
                     Placeholder::make('updated_at')->label('Update Terakhir')->content(fn($record) => $record->updated_at->format('d-M Y H:i')),
@@ -178,26 +384,6 @@ class CatatanHarianResource extends Resource
         ];
     }
 
-    public static function getEloquentQuery(): Builder
-    {
-        $user = auth()->user();
-
-        if ($user->hasRole('admin')) {
-            return parent::getEloquentQuery();
-        }
-
-        $kelasIdList = $user->kelas->pluck('id')->toArray();
-        $isGuru = $user->hasRole('guru');
-        $isWaliKelas = $user->hasRole('wali_kelas');
-
-        return parent::getEloquentQuery()
-            ->where(function ($q) use ($isGuru, $isWaliKelas, $user, $kelasIdList) {
-                if ($isGuru) {
-                    $q->orWhere('user_id', $user->id);
-                }
-                if ($isWaliKelas && count($kelasIdList) > 0) {
-                    $q->orWhereHas('jadwal', fn($jadwal) => $jadwal->whereIn('kelas_id', $kelasIdList));
-                }
-            });
-    }
+    // Role filtering is handled by global scope in CatatanHarian model
+    // See: App\Models\CatatanHarian::booted() method
 }

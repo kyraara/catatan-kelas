@@ -17,11 +17,17 @@ class LatestCatatanHarian extends BaseWidget
 
     protected static ?string $heading = '10 Catatan Harian Terbaru';
     public static int $dashboardSort = 2;
+    
+    // Nonaktifkan polling untuk mengurangi request otomatis
+    protected static ?string $pollingInterval = null;
 
 
     public function getTableQuery(): Builder
     {
-        return CatatanHarian::query()->latest()->limit(10);
+        return CatatanHarian::query()
+            ->with(['jadwal.kelas', 'jadwal.mataPelajaran', 'user'])
+            ->latest()
+            ->limit(10);
     }
 
     protected function getTableColumns(): array

@@ -8,7 +8,8 @@ use Spatie\Activitylog\LogOptions;
 
 class Jadwal extends Model
 {
-    use LogsActivity;
+    // LogsActivity dinonaktifkan sementara untuk performa
+    // use LogsActivity;
     protected static $logAttributes = [
         'kelas_id',
         'hari',

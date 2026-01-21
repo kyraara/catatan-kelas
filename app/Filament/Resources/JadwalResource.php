@@ -34,13 +34,15 @@ class JadwalResource extends Resource
                 Forms\Components\TextInput::make('jam_ke')->numeric()->required(),
                 Forms\Components\Select::make('mapel_id')->relationship('mataPelajaran', 'nama')->required(),
                 Forms\Components\Select::make('guru_id')
-                    ->options(\App\Models\User::role('guru')->pluck('name', 'id'))
+                    ->label('Guru')
+                    ->relationship('guru', 'name', fn($query) => $query->role('guru'))
+                    ->searchable()
+                    ->preload()
                     ->live()
                     ->afterStateUpdated(function ($state, callable $set) {
                         $guru = \App\Models\User::find($state);
-                        $set('kode_guru', $guru?->kode_guru ?: $guru?->nip); // pilih field sesuai DB
+                        $set('kode_guru', $guru?->kode_guru ?: $guru?->nip);
                     })
-                    ->searchable()
                     ->required(),
                 Forms\Components\TextInput::make('kode_guru')
                     ->label('Kode Guru')
@@ -119,5 +121,35 @@ class JadwalResource extends Resource
             'create' => Pages\CreateJadwal::route('/create'),
             'edit' => Pages\EditJadwal::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $user = auth()->user();
+
+        // Admin bisa lihat semua jadwal
+        if ($user->hasRole('admin')) {
+            return parent::getEloquentQuery();
+        }
+
+        $isGuru = $user->hasRole('guru');
+        $isWaliKelas = $user->hasRole('wali_kelas');
+
+        // Ambil kelas yang diwalikan (jika wali kelas)
+        $kelasWaliIds = $isWaliKelas 
+            ? \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id')->toArray()
+            : [];
+
+        return parent::getEloquentQuery()
+            ->where(function ($query) use ($user, $isGuru, $isWaliKelas, $kelasWaliIds) {
+                // Guru: lihat jadwal yang dia ajar
+                if ($isGuru) {
+                    $query->orWhere('guru_id', $user->id);
+                }
+                // Wali Kelas: lihat jadwal di kelas yang diwalikan
+                if ($isWaliKelas && !empty($kelasWaliIds)) {
+                    $query->orWhereIn('kelas_id', $kelasWaliIds);
+                }
+            });
     }
 }

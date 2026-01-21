@@ -28,9 +28,9 @@
     <div class="header">
         <img src="{{ public_path('logo.png') }}" class="logo" alt="Logo sekolah">
         <div class="title-block">
-            <div class="school-name">SMA / SMK NEGERI [NAMA SEKOLAH]</div>
+            <div class="school-name">SMK N 2 Sekayu</div>
             <div class="report-title">Laporan Catatan Harian Guru</div>
-            <div style="font-size: 9.5pt;">Jl. Pendidikan No. 123 Kabupaten/Kota</div>
+            <div style="font-size: 9.5pt;"> JL.TERMINAL RANDIK.RT.04.RW.01, Kayuara, Kec. Sekayu, Kab. Musi Banyuasin, Sumatera Selatan.</div>
         </div>
     </div>
     <hr>
@@ -48,23 +48,40 @@
                 <th>Kelas</th>
                 <th>Guru</th>
                 <th>Materi</th>
-                <th>Murid Tidak Hadir</th>
+                <th>Presensi (H/I/S/A)</th>
+                <th>Tidak Hadir</th>
                 <th>Catatan</th>
             </tr>
         </thead>
         <tbody>
             @forelse($catatan as $c)
+            @php
+                $ringkasan = $c->getRingkasanPresensi();
+                $tidakHadir = collect();
+                foreach (['izin', 'sakit', 'alpa'] as $status) {
+                    $siswa = $c->getSiswaByStatus($status);
+                    foreach ($siswa as $nama) {
+                        $label = match($status) {
+                            'izin' => 'I',
+                            'sakit' => 'S',
+                            'alpa' => 'A',
+                        };
+                        $tidakHadir->push("{$nama}({$label})");
+                    }
+                }
+            @endphp
             <tr>
                 <td class="text-center">{{ $c->tanggal }}</td>
                 <td class="text-center">{{ $c->jadwal?->kelas?->nama ?? '-' }}</td>
                 <td>{{ $c->jadwal?->guru?->name ?? '-' }}</td>
                 <td>{{ $c->materi }}</td>
-                <td>{{ $c->murid_tidak_hadir }}</td>
+                <td class="text-center">{{ $ringkasan['hadir'] }}/{{ $ringkasan['izin'] }}/{{ $ringkasan['sakit'] }}/{{ $ringkasan['alpa'] }}</td>
+                <td>{{ $tidakHadir->isEmpty() ? '-' : $tidakHadir->join(', ') }}</td>
                 <td>{{ $c->catatan }}</td>
             </tr>
             @empty
             <tr>
-                <td colspan="6" class="text-center" style="color:#a33;padding:20px;">Data tidak ditemukan</td>
+                <td colspan="7" class="text-center" style="color:#a33;padding:20px;">Data tidak ditemukan</td>
             </tr>
             @endforelse
         </tbody>

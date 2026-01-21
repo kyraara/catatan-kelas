@@ -64,4 +64,10 @@ class ListJadwals extends ListRecords
                 }),
         ];
     }
+
+    protected function getTableQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getTableQuery()
+            ->with(['kelas', 'mataPelajaran', 'guru']);
+    }
 }

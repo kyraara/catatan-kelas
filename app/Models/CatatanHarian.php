@@ -8,7 +8,8 @@ use Spatie\Activitylog\LogOptions;
 
 class CatatanHarian extends Model
 {
-    use LogsActivity;
+    // LogsActivity dinonaktifkan sementara untuk performa
+    // use LogsActivity;
 
     protected static $logAttributes = [
         'jadwal_id',
@@ -23,6 +24,8 @@ class CatatanHarian extends Model
         'jadwal_id',
         'tanggal',
         'materi',
+        'jam_kosong',
+        'catatan',
         'guru_id',
         'user_id',
         'hadir',
@@ -68,18 +71,45 @@ class CatatanHarian extends Model
 
             if (!$user) return;
 
+            // Admin bisa lihat semua
             if ($user->hasRole('admin')) {
                 return;
             }
 
-            if ($user->hasRole('guru')) {
-                $query->where('user_id', $user->id);
+            $isGuru = $user->hasRole('guru');
+            $isWaliKelas = $user->hasRole('wali_kelas');
+
+            // Guru hanya bisa lihat catatan dari jadwal yang dia ajar + yang dia input
+            if ($isGuru && !$isWaliKelas) {
+                $query->where(function($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                      ->orWhereHas('jadwal', fn($jadwal) => $jadwal->where('guru_id', $user->id));
+                });
+                return;
             }
 
-            if ($user->hasRole('wali_kelas')) {
-                $kelasIds = \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id');
-                $query->whereHas('jadwal', function ($q) use ($kelasIds) {
-                    $q->whereIn('kelas_id', $kelasIds);
+            // Wali kelas bisa lihat catatan di kelasnya + (jika juga guru) jadwal yang diajar
+            if ($isWaliKelas) {
+                // Cache kelasIds untuk menghindari query berulang
+                $kelasIds = cache()->remember(
+                    "wali_kelas_ids_{$user->id}",
+                    now()->addMinutes(5),
+                    fn() => \App\Models\Kelas::where('wali_kelas_id', $user->id)->pluck('id')->toArray()
+                );
+                
+                $query->where(function($q) use ($user, $kelasIds, $isGuru) {
+                    // Catatan yang diinput sendiri
+                    $q->where('user_id', $user->id);
+                    
+                    // Catatan di kelas yang diwalikan
+                    if (!empty($kelasIds)) {
+                        $q->orWhereHas('jadwal', fn($jadwal) => $jadwal->whereIn('kelas_id', $kelasIds));
+                    }
+                    
+                    // Jika juga guru, lihat jadwal yang diajar
+                    if ($isGuru) {
+                        $q->orWhereHas('jadwal', fn($jadwal) => $jadwal->where('guru_id', $user->id));
+                    }
                 });
             }
         });
@@ -101,5 +131,28 @@ class CatatanHarian extends Model
     public function isApproved()
     {
         return !is_null($this->approved_at);
+    }
+
+    // Relasi ke presensi siswa
+    public function presensis()
+    {
+        return $this->hasMany(\App\Models\Presensi::class);
+    }
+
+    // Helper: Ringkasan jumlah per status
+    public function getRingkasanPresensi()
+    {
+        return [
+            'hadir' => $this->presensis()->where('status', 'hadir')->count(),
+            'izin' => $this->presensis()->where('status', 'izin')->count(),
+            'sakit' => $this->presensis()->where('status', 'sakit')->count(),
+            'alpa' => $this->presensis()->where('status', 'alpa')->count(),
+        ];
+    }
+
+    // Helper: Daftar siswa per status
+    public function getSiswaByStatus($status)
+    {
+        return $this->presensis()->with('siswa')->where('status', $status)->get()->pluck('siswa.nama');
     }
 }
