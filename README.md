@@ -1,61 +1,132 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 📚 Catatan Kelas
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi pencatatan harian kelas berbasis web menggunakan Laravel dan Filament. Digunakan untuk mencatat aktivitas pembelajaran harian, presensi siswa, dan approval oleh wali kelas.
 
-## About Laravel
+## ✨ Fitur Utama
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Catatan Harian** - Input materi, jam kosong, catatan, dan presensi siswa
+- **Multi-Role Access Control** - Admin, Guru, dan Wali Kelas dengan akses berbeda
+- **Approval System** - Wali kelas dapat meng-approve catatan harian
+- **Laporan** - Generate laporan catatan harian dalam format PDF
+- **Dashboard** - Widget statistik dan catatan terbaru
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 👥 Role & Permission
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+| Role | Akses |
+|------|-------|
+| **Admin** | Akses penuh ke semua data dan fitur |
+| **Guru** | Melihat jadwal & catatan yang dia ajar |
+| **Wali Kelas** | Melihat semua catatan di kelas yang diwalikan + approve |
+| **Wali Kelas + Guru** | Kombinasi kedua role |
 
-## Learning Laravel
+## 🛠️ Tech Stack
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Laravel 11** - PHP Framework
+- **Filament 3** - Admin Panel
+- **MySQL** - Database
+- **Spatie Permission** - Role & Permission Management
+- **DomPDF** - PDF Generation
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## 📦 Instalasi
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Requirements
+- PHP >= 8.2
+- Composer
+- MySQL/MariaDB
+- Node.js & NPM
 
-## Laravel Sponsors
+### Setup
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+# Clone repository
+git clone https://github.com/kyraara/catatan-kelas.git
+cd catatan-kelas
 
-### Premium Partners
+# Install dependencies
+composer install
+npm install
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# Copy environment file
+cp .env.example .env
 
-## Contributing
+# Generate app key
+php artisan key:generate
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# Configure database di .env
+# DB_DATABASE=catatan_kelas
+# DB_USERNAME=root
+# DB_PASSWORD=
 
-## Code of Conduct
+# Run migrations
+php artisan migrate
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# Seed dummy data (optional, untuk testing)
+php artisan db:seed --class=DummyDataSeeder
 
-## Security Vulnerabilities
+# Build assets
+npm run build
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# Start server
+php artisan serve
+```
 
-## License
+## 🧪 Testing dengan Dummy Data
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Jalankan seeder untuk mengisi data dummy:
+
+```bash
+php artisan db:seed --class=DummyDataSeeder
+```
+
+### Akun Testing
+
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | admin@school.test | password |
+| Guru (Matematika) | budi.guru@school.test | password |
+| Guru (B. Indo) | siti.guru@school.test | password |
+| Wali Kelas 10A + Guru IPA | andi.walikelas@school.test | password |
+| Wali Kelas 10B + Guru IPS | dewi.walikelas@school.test | password |
+| Wali Kelas 10C | rudi.walikelas@school.test | password |
+
+## 📁 Struktur Penting
+
+```
+app/
+├── Filament/
+│   ├── Resources/
+│   │   ├── CatatanHarianResource.php   # CRUD Catatan Harian
+│   │   ├── JadwalResource.php          # CRUD Jadwal
+│   │   ├── KelasResource.php           # CRUD Kelas
+│   │   └── SiswaResource.php           # CRUD Siswa
+│   ├── Pages/
+│   │   └── LaporanCatatanHarian.php    # Halaman Laporan
+│   └── Widgets/
+│       └── LatestCatatanHarian.php     # Widget Dashboard
+├── Models/
+│   ├── CatatanHarian.php   # Model dengan Global Scope role-based
+│   ├── Jadwal.php
+│   ├── Kelas.php
+│   ├── Siswa.php
+│   └── Presensi.php
+```
+
+## 🔐 Role-Based Filtering
+
+### CatatanHarian
+- **Admin**: Semua catatan
+- **Guru**: Catatan dari jadwal yang diajar + yang diinput sendiri
+- **Wali Kelas**: Catatan di kelas yang diwalikan + yang diinput sendiri
+
+### Jadwal
+- **Admin**: Semua jadwal
+- **Guru**: Jadwal yang diajar
+- **Wali Kelas**: Jadwal di kelas yang diwalikan + yang diajar
+
+## 📝 License
+
+MIT License - bebas digunakan untuk keperluan apapun.
+
+## 🤝 Kontribusi
+
+Pull request dan issue sangat diterima!
