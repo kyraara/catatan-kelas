@@ -34,19 +34,43 @@ Aplikasi pencatatan harian kelas berbasis web menggunakan Laravel dan Filament. 
 - Composer
 - MySQL/MariaDB
 - Node.js & NPM
+- Git
 
-### Setup
+### Setup untuk Laragon
 
 ```bash
-# Clone repository
+# Clone ke folder www Laragon
+cd C:\laragon\www
 git clone https://github.com/kyraara/catatan-kelas.git
 cd catatan-kelas
 
+# Lanjut ke langkah instalasi di bawah
+```
+
+### Setup untuk XAMPP
+
+```bash
+# Clone ke folder htdocs XAMPP
+cd C:\xampp\htdocs
+git clone https://github.com/kyraara/catatan-kelas.git
+cd catatan-kelas
+
+# Lanjut ke langkah instalasi di bawah
+```
+
+> **Note untuk XAMPP:** Pastikan module Apache dan MySQL sudah running di XAMPP Control Panel sebelum menjalankan migrasi.
+
+### Langkah Instalasi (Semua Environment)
+
+```bash
 # Install dependencies
 composer install
 npm install
 
 # Copy environment file
+# Windows CMD:
+copy .env.example .env
+# PowerShell/Git Bash:
 cp .env.example .env
 
 # Generate app key
@@ -57,6 +81,9 @@ php artisan key:generate
 # DB_USERNAME=root
 # DB_PASSWORD=
 
+# Buat database di phpMyAdmin atau terminal:
+# CREATE DATABASE catatan_kelas;
+
 # Run migrations
 php artisan migrate
 
@@ -66,9 +93,16 @@ php artisan db:seed --class=DummyDataSeeder
 # Build assets
 npm run build
 
-# Start server
+# Start development server
 php artisan serve
 ```
+
+### Akses Aplikasi
+
+- **Dengan `php artisan serve`:** http://localhost:8000
+- **Laragon (Pretty URL):** http://catatan-kelas.test
+- **XAMPP:** http://localhost/catatan-kelas/public
+
 
 ## 🧪 Testing dengan Dummy Data
 
