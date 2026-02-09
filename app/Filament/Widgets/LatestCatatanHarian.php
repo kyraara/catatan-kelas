@@ -47,7 +47,7 @@ class LatestCatatanHarian extends BaseWidget
     public function mount()
     {
         if (auth()->user()->hasRole('wali_kelas')) {
-            $jumlah = \App\Models\CatatanHarian::whereNull('approved_at')
+            $jumlah = CatatanHarian::whereNull('approved_at')
                 ->whereHas('jadwal.kelas', fn($q) => $q->where('wali_kelas_id', auth()->id()))
                 ->count();
 

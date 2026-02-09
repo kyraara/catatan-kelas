@@ -71,7 +71,7 @@ class CatatanHarianResource extends Resource
                     }
                 )
                 ->getOptionLabelFromRecordUsing(fn($record) => 
-                    $record->kelas->nama . ' - ' . $record->mataPelajaran->nama . ' (' . $record->guru->name . ')'
+                    ($record->kelas?->nama ?? 'Kelas tidak ditemukan') . ' - ' . ($record->mataPelajaran?->nama ?? 'Mapel tidak ditemukan') . ' (' . ($record->guru?->name ?? 'Guru tidak ditemukan') . ')'
                 )
                 ->searchable()
                 ->preload()
